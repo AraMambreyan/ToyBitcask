@@ -1,7 +1,9 @@
 use clap::{App, AppSettings, Arg, SubCommand};
+use kvs::{DatabaseError, KvStore, Result};
+use std::env::current_dir;
 use std::process::exit;
 
-fn main() {
+fn main() -> Result<()> {
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -32,17 +34,41 @@ fn main() {
         .get_matches();
 
     match matches.subcommand() {
-        ("set", Some(_matches)) => {
-            eprintln!("unimplemented");
-            exit(1);
+        ("set", Some(matches)) => {
+            let key = matches.value_of("KEY").unwrap();
+            let value = matches.value_of("VALUE").unwrap();
+
+            let mut store = KvStore::open(current_dir()?)?;
+
+            store.set(key.to_string(), value.to_string())
         }
-        ("get", Some(_matches)) => {
-            eprintln!("unimplemented");
-            exit(1);
+        ("get", Some(matches)) => {
+            let key = matches.value_of("KEY").unwrap();
+            let store = KvStore::open(current_dir()?)?;
+
+            match store.get(key.to_string())? {
+                Some(x) => {
+                    println!("{x}");
+                }
+                None => {
+                    println!("{}", DatabaseError::KeyNotFound);
+                }
+            }
+
+            Ok(())
         }
-        ("rm", Some(_matches)) => {
-            eprintln!("unimplemented");
-            exit(1);
+        ("rm", Some(matches)) => {
+            let key = matches.value_of("KEY").unwrap();
+            let mut store = KvStore::open(current_dir()?)?;
+
+            match store.remove(key.to_string()) {
+                Ok(()) => Ok(()),
+                Err(DatabaseError::KeyNotFound) => {
+                    println!("{}", DatabaseError::KeyNotFound);
+                    exit(1);
+                }
+                Err(e) => Err(e),
+            }
         }
         _ => unreachable!(),
     }
